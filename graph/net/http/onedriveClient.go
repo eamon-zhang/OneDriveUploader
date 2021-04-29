@@ -4,17 +4,18 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
-	"main/fileutil"
 	"io"
+	"main/fileutil"
 	"net/http"
 	"net/url"
 	"os"
 )
 
 const (
-	baseURL                       = "https://graph.microsoft.com/v1.0"
 	statusInsufficientStorage int = 507
 )
+
+var BaseURL = "https://graph.microsoft.com/v1.0"
 
 // OneDrive is the entry point for the client. It manages the communication with
 // Microsoft OneDrive Graph API
@@ -28,7 +29,7 @@ type OneDrive struct {
 func NewOneDriveClient(c *http.Client, debug bool) *OneDrive {
 	drive := OneDrive{
 		Client:  c,
-		BaseURL: baseURL,
+		BaseURL: BaseURL,
 	}
 	return &drive
 }
@@ -98,6 +99,7 @@ func (od *OneDrive) NewRequest(method, uri string, requestHeaders map[string]str
 	if err != nil {
 		return nil, fmt.Errorf("Unable to parse the file into Bytes  reason: %v", err)
 	}
+
 	var req *http.Request
 	if isValidUrl(uri) {
 		req, err = http.NewRequest(method, uri, reqBody)
@@ -124,6 +126,7 @@ func (od *OneDrive) NewRequest(method, uri string, requestHeaders map[string]str
 //Execute request
 func (od *OneDrive) Do(req *http.Request) (*http.Response, error) {
 	resp, err := od.Client.Do(req)
+	//log.Panicf("%+v\n%+v", resp, err)
 	if err != nil {
 		return nil, err
 	}

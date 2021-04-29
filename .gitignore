@@ -1,6 +1,4 @@
 .history
-config.json
-temp.torrent
 .goreleaser.yml
 dist
 .idea
@@ -8,3 +6,6 @@ info
 *.json
 *.exe
 od
+TestUploadFolder
+OneDriveUploader
+*.toml

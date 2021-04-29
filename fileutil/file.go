@@ -5,6 +5,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"strconv"
 	"time"
 )
 
@@ -13,6 +14,7 @@ const SizeTypeLarge = "LARGE"
 const SizeTypeSmall = "SMALL"
 
 var defaultChunkSize = int64(10 * 1024 * 1024)
+var timeOut = 60
 
 type FileInfo struct {
 	FileData *os.File
@@ -22,11 +24,18 @@ type FileInfo struct {
 func GetDefaultChunkSize() int64 {
 	return defaultChunkSize
 }
-
 func SetDefaultChunkSize(MB int) int64 {
 	defaultChunkSize = int64(MB * 1024 * 1024)
 	return defaultChunkSize
 }
+func GetTimeOut() int {
+	return timeOut
+}
+func SetTimeOut(times int) int {
+	timeOut = times
+	return timeOut
+}
+
 func GetAllUploadItemsFrmSource(sourcePath string) (map[string]FileInfo, error) {
 	fileMap := make(map[string]FileInfo)
 	err := filepath.Walk(sourcePath,
@@ -63,7 +72,7 @@ func GetAllUploadItemsFrmSource(sourcePath string) (map[string]FileInfo, error) 
 }
 
 //GetFilePartInBytes can returns the file in parts based on the provided offset
-func GetFilePartInBytes(buffer *[]byte,filePath string, startingOffset int64) error {
+func GetFilePartInBytes(buffer *[]byte, filePath string, startingOffset int64) error {
 	file, err := os.Open(filePath)
 	defer file.Close()
 
@@ -87,7 +96,7 @@ func GetFilePartInBytes(buffer *[]byte,filePath string, startingOffset int64) er
 			return fmt.Errorf("readAt: %v", err)
 		}
 	}
-	return  nil
+	return nil
 }
 
 //Returns the start offset chunk list based on the file size
@@ -170,4 +179,28 @@ func ReadFile(file *os.File) ([]byte, error) {
 		return nil, err
 	}
 	return buffer, nil
+}
+
+func Byte2Readable(bytes float64) string {
+	const kb float64 = 1024
+	const mb = kb * 1024
+	const gb = mb * 1024
+	var readable float64
+	var unit string
+	_bytes := bytes
+
+	if _bytes >= gb {
+		// xx GB
+		readable = _bytes / gb
+		unit = "GB"
+	} else if _bytes < gb && _bytes >= mb {
+		// xx MB
+		readable = _bytes / mb
+		unit = "MB"
+	} else {
+		// xx KB
+		readable = _bytes / kb
+		unit = "KB"
+	}
+	return strconv.FormatFloat(readable, 'f', 2, 64) + " " + unit
 }

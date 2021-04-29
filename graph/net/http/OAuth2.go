@@ -13,14 +13,35 @@ import (
 	"github.com/buger/jsonparser"
 )
 
-type token struct {
-	RefreshToken string `json:"refresh_token"`
+type Certificate struct {
+	Drive        string      `json:"Drive"`
+	RefreshToken string      `json:"RefreshToken"`
+	ThreadNum    int         `json:"ThreadNum"`
+	BlockSize    int         `json:"BlockSize"`
+	MainLand     bool        `json:"MainLand"`
+	Language     string      `json:"Language"`
+	TimeOut      int         `json:"TimeOut"`
+	BotKey       string      `json:"BotKey"`
+	UserID       string      `json:"UserID"`
+	Other        interface{} `json:"Other"`
 }
 
-func NewPassCheck(oauth2URL string, ms int) string {
-	Bearer := getAccessToken(oauth2URL, ms)
+var GraphURL = "https://graph.microsoft.com/v1.0/me/"
+var TokenURL = "https://login.microsoftonline.com/common/oauth2/v2.0/token"
+var Host = "login.microsoftonline.com"
+var isCN = false
 
-	url := "https://graph.microsoft.com/v1.0/me/"
+func ChangeCNURL() {
+	GraphURL = "https://microsoftgraph.chinacloudapi.cn/v1.0/me/"
+	TokenURL = "https://login.chinacloudapi.cn/common/oauth2/v2.0/token"
+	Host = "login.chinacloudapi.cn"
+	isCN = true
+	BaseURL = "https://microsoftgraph.chinacloudapi.cn/v1.0"
+}
+func NewPassCheck(oauth2URL string, ms int, lang string) string {
+	Bearer := getAccessToken(oauth2URL, ms, lang)
+
+	url := GraphURL
 	req, err := http.NewRequest("GET", url, nil)
 	req.Header.Set("Authorization", "Bearer "+Bearer)
 	client := &http.Client{}
@@ -49,13 +70,13 @@ func NewPassCheck(oauth2URL string, ms int) string {
 	return "./" + mail + ".json"
 }
 
-// GetMyIDAndBearer is get microsoft ID and access token
-func GetMyIDAndBearer(infoPath string) (string, string) {
+// GetMyIDAndBearer is get microsoft ID and access Certificate
+func GetMyIDAndBearer(infoPath string, Thread int, BlockSize int, Language string, TimeOut int, BotKey string, UserID string) (string, string) {
 	MyID := ""
 	Bearer := ""
 	_, err := os.Stat(infoPath)
-	Bearer = refreshAccessToken(infoPath)
-	url := "https://graph.microsoft.com/v1.0/me/"
+	Bearer = refreshAccessToken(infoPath, Thread, BlockSize, Language, TimeOut, BotKey, UserID)
+	url := GraphURL
 	req, err := http.NewRequest("GET", url, nil)
 	req.Header.Set("Authorization", "Bearer "+Bearer)
 	client := &http.Client{}
@@ -78,7 +99,7 @@ func GetMyIDAndBearer(infoPath string) (string, string) {
 	return MyID, Bearer
 }
 
-func getAccessToken(oauth2URL string, ms int) string {
+func getAccessToken(oauth2URL string, ms int, lang string) string {
 	var re *regexp.Regexp
 	if ms == 1 {
 		re = regexp.MustCompile(`(?m)code=(.*?)$`)
@@ -93,10 +114,13 @@ func getAccessToken(oauth2URL string, ms int) string {
 
 	code := re.FindStringSubmatch(str)[1]
 	//fmt.Println(code)
-	url := "https://login.microsoftonline.com/common/oauth2/v2.0/token"
+	url := TokenURL
 	req, err := http.NewRequest("POST", url, strings.NewReader(fmt.Sprintf("client_id=ad5e65fd-856d-4356-aefc-537a9700c137&scope=offline_access%%20User.Read%%20Files.ReadWrite.All&code=%s&redirect_uri=http://localhost/onedrive-login&grant_type=authorization_code", code)))
+	if isCN {
+		req, err = http.NewRequest("POST", url, strings.NewReader(fmt.Sprintf("client_id=4fbf37cf-dc83-4b60-b6c1-6230546e247b&code=%s&redirect_uri=http%%3A%%2F%%2Flocalhost%%2Fonedrive-login&grant_type=authorization_code&client_secret=y-L73QIBxO_UmJvOVw8YMlX~8B_h4D6zzT", code)))
+	}
 	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
-	req.Header.Set("Host", "https://login.microsoftonline.com")
+	req.Host = Host
 	client := &http.Client{}
 	resp, err := client.Do(req)
 	if err != nil {
@@ -119,8 +143,16 @@ func getAccessToken(oauth2URL string, ms int) string {
 	}
 	//log.Println(refreshToken)
 
-	info := token{
+	info := Certificate{
+		Drive:        "OneDrive",
 		RefreshToken: refreshToken,
+		ThreadNum:    3,
+		BlockSize:    10,
+		MainLand:     isCN,
+		Language:     lang,
+		TimeOut:      60,
+		BotKey:       "",
+		UserID:       "",
 	}
 	// 创建文件
 	filePtr, err := os.Create("./amazing.json")
@@ -138,24 +170,27 @@ func getAccessToken(oauth2URL string, ms int) string {
 	return accessToken
 }
 
-func refreshAccessToken(path string) string {
+func refreshAccessToken(path string, Thread int, BlockSize int, Language string, TimeOut int, BotKey string, UserID string) string {
 	filePtr, err := os.Open(path)
 	if err != nil {
 		log.Panicln(err)
 		return ""
 	}
 	defer filePtr.Close()
-	var info token
+	var info Certificate
 	// 创建json解码器
 	decoder := json.NewDecoder(filePtr)
 	err = decoder.Decode(&info)
 	if err != nil {
 		log.Panicln(err.Error())
 	}
-	url := "https://login.microsoftonline.com/common/oauth2/v2.0/token"
+	url := TokenURL
 	req, err := http.NewRequest("POST", url, strings.NewReader(fmt.Sprintf("client_id=ad5e65fd-856d-4356-aefc-537a9700c137&scope=offline_access%%20User.Read%%20Files.ReadWrite.All&refresh_token=%s&redirect_uri=http://localhost/onedrive-login&grant_type=refresh_token", info.RefreshToken)))
+	if isCN {
+		req, err = http.NewRequest("POST", url, strings.NewReader(fmt.Sprintf("client_id=4fbf37cf-dc83-4b60-b6c1-6230546e247b&scope=offline_access%%20User.Read%%20Files.ReadWrite.All&refresh_token=%s&redirect_uri=http://localhost/onedrive-login&grant_type=refresh_token&client_secret=y-L73QIBxO_UmJvOVw8YMlX~8B_h4D6zzT", info.RefreshToken)))
+	}
 	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
-	req.Header.Set("Host", "https://login.microsoftonline.com")
+	req.Host = Host
 	client := &http.Client{}
 	resp, err := client.Do(req)
 	if err != nil {
@@ -175,8 +210,16 @@ func refreshAccessToken(path string) string {
 	}
 	// log.Println(refreshToken)
 
-	info = token{
+	info = Certificate{
+		Drive:        "OneDrive",
 		RefreshToken: refreshToken,
+		ThreadNum:    Thread,
+		BlockSize:    BlockSize,
+		MainLand:     isCN,
+		Language:     Language,
+		TimeOut:      TimeOut,
+		BotKey:       BotKey,
+		UserID:       UserID,
 	}
 	// 创建文件
 	filePtr, err = os.Create(path)
